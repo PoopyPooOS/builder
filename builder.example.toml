@@ -1,0 +1,14 @@
+# Build type (e.g., "Release" or "Debug")
+build_type = "Release"
+
+# Directory for components (needs to be an absolute path)
+components_dir = "/path/to/userspace"
+
+# Directory for root file system (needs to be an absolute path)
+rootfs_dir = "/path/to/rootfs"
+
+# Directory for distribution (needs to be an absolute path)
+dist_dir = "/path/to/dist"
+
+# QEMU launch arguments
+qemu_args = ["-m", "512M", "-append", "loglevel=3", "-enable-kvm", "-smp", "2"]
