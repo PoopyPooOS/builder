@@ -1,4 +1,4 @@
-# Build type (e.g., "Release" or "Debug")
+# Build type (can only be "Release" or "Debug")
 build_type = "Release"
 
 # Directory for components (needs to be an absolute path)
