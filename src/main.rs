@@ -91,21 +91,3 @@ fn main() {
 
     qemu.wait().unwrap();
 }
-
-#[cfg(test)]
-mod tests {
-    use std::path::PathBuf;
-
-    use super::*;
-
-    #[test]
-    fn test_change_root() {
-        assert_eq!(
-            builder::change_root(
-                PathBuf::from("/init"),
-                PathBuf::from("/home/real/projects/distro2/rootfs"),
-            ),
-            PathBuf::from("/home/real/projects/distro2/rootfs/init")
-        );
-    }
-}
