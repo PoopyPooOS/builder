@@ -2,40 +2,26 @@
 
 use serde::Deserialize;
 use std::{
-    env::{self, current_dir, set_current_dir},
     fs,
-    path::PathBuf,
     process::{Command, Stdio},
     thread,
 };
 
-#[derive(Deserialize)]
-struct ComponentConfig {
-    out: String,
-    binary_path: Option<String>,
-}
+mod builder;
 
 #[derive(Debug, Clone, Deserialize)]
 struct Config {
-    build_type: BuildType,
+    build_type: builder::BuildType,
     components_dir: String,
     rootfs_dir: String,
     dist_dir: String,
     qemu_args: Vec<String>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
-enum BuildType {
-    Debug,
-    Release,
-}
-
 const DISTRO_NAME: &str = "PoopyPooOS";
-const BUILDER_CONFIG_NAME: &str = "builder.toml";
+const BUILDER_CONFIG_NAME: &str = "../builder.toml";
 
 fn main() {
-    let orginal_cwd = current_dir().expect("Failed to get current directory");
-
     let config = {
         let config_raw =
             fs::read_to_string(BUILDER_CONFIG_NAME).expect("Failed to read config file");
@@ -55,18 +41,26 @@ fn main() {
             let config = config.clone();
 
             thread::spawn(move || {
-                build(component.file_name().to_str().unwrap(), config);
+                builder::build(component.file_name().to_str().unwrap(), config);
             })
         })
         .collect();
 
     for handle in handles {
-        handle.join().unwrap();
+        match handle.join() {
+            Ok(_) => (),
+            Err(err) => {
+                if let Some(panic_message) = err.downcast_ref::<&str>() {
+                    println!("Build thread panicked with message: {}", panic_message);
+                } else {
+                    println!("Build thread panicked with an unknown message.");
+                }
+            }
+        }
     }
 
     println!("\nAll components built successfully!\n");
     println!("Building initrd...");
-    set_current_dir(orginal_cwd).expect("Failed to set cwd");
 
     let initrd = Command::new("sh")
         .args([
@@ -98,76 +92,20 @@ fn main() {
     qemu.wait().unwrap();
 }
 
-fn build(name: &str, config: Config) {
-    println!("Building {}", name);
-    let cwd = current_dir().expect("Failed to get current directory");
-    let component_path = {
-        let mut ancestors = cwd.ancestors();
-        ancestors.next();
-        let path = ancestors.next().unwrap();
-        path.join(config.components_dir).join(name)
-    };
+#[cfg(test)]
+mod tests {
+    use std::path::PathBuf;
 
-    if component_path.is_file() {
-        return;
+    use super::*;
+
+    #[test]
+    fn test_change_root() {
+        assert_eq!(
+            builder::change_root(
+                PathBuf::from("/init"),
+                PathBuf::from("/home/real/projects/distro2/rootfs"),
+            ),
+            PathBuf::from("/home/real/projects/distro2/rootfs/init")
+        );
     }
-
-    let build_args = match config.build_type {
-        BuildType::Debug => vec!["build"],
-        BuildType::Release => vec!["build", "--release"],
-    };
-
-    let output = Command::new("/usr/bin/cargo")
-        .args(build_args)
-        .current_dir(&component_path)
-        .output()
-        .expect("Failed to execute 'cargo build'");
-
-    if output.status.success() {
-        println!("Binaries for {} built successfully", name);
-    } else {
-        println!("Binaries for {} failed to build", name);
-        if let Ok(stderr) = String::from_utf8(output.stderr) {
-            println!("Build error output: {}", stderr);
-        }
-    }
-
-    let build_config = {
-        let raw_toml = fs::read_to_string(component_path.join("build.toml"))
-            .expect("Failed to read build config");
-        let parsed: ComponentConfig =
-            toml::from_str(&raw_toml).expect("Failed to parse build config");
-        parsed
-    };
-
-    let component_binary_path: PathBuf = if build_config.binary_path.is_none() {
-        match config.build_type {
-            BuildType::Debug => component_path.join(format!("target/debug/{}", name)),
-            BuildType::Release => component_path.join(format!("target/release/{}", name)),
-        }
-    } else {
-        PathBuf::from(build_config.binary_path.unwrap())
-    };
-
-    let mut binary_out_directory = PathBuf::from(&build_config.out);
-    binary_out_directory.pop();
-
-    println!("Entering directory {}", component_path.display());
-
-    env::set_current_dir(component_path)
-        .unwrap_or_else(|_| panic!("Failed to set cwd for component {}", name));
-
-    fs::create_dir_all(binary_out_directory)
-        .unwrap_or_else(|_| panic!("Failed to create parent directories for component {}", name));
-
-    println!(
-        "Copying {} to {}",
-        component_binary_path.display(),
-        build_config.out
-    );
-
-    fs::copy(component_binary_path, build_config.out)
-        .unwrap_or_else(|_| panic!("Failed to copy binary for component {}", name));
-
-    println!("Finished building {}", name);
 }
