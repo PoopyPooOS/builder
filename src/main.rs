@@ -19,7 +19,7 @@ struct Config {
 }
 
 const DISTRO_NAME: &str = "PoopyPooOS";
-const BUILDER_CONFIG_NAME: &str = "../builder.toml";
+const BUILDER_CONFIG_NAME: &str = "builder.toml";
 
 fn main() {
     let config = {
