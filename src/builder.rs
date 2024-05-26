@@ -22,7 +22,7 @@ pub fn build(name: &str, config: Config) {
         let mut ancestors = cwd.ancestors();
         ancestors.next();
         let path = ancestors.next().unwrap();
-        path.join(config.components_dir).join(name)
+        path.join(&config.components_dir).join(name)
     };
 
     if component_path.is_file() {
@@ -63,21 +63,34 @@ pub fn build(name: &str, config: Config) {
             BuildType::Release => component_path.join(format!("target/release/{}", name)),
         }
     } else {
-        PathBuf::from(build_config.binary_path.unwrap())
+        change_root(
+            PathBuf::from(&build_config.binary_path.unwrap()),
+            component_path,
+        )
     };
 
-    let binary_out = change_root(
-        PathBuf::from(&build_config.out),
-        PathBuf::from(&config.rootfs_dir),
-    );
+    // Some components might use /dev/null as their output which means they should not be copied.
+    let binary_out = if build_config.out == "/dev/null" {
+        return;
+    } else {
+        change_root(
+            PathBuf::from(&build_config.out),
+            PathBuf::from(&config.rootfs_dir),
+        )
+    };
 
     let binary_out_directory = binary_out.parent().unwrap();
 
     fs::create_dir_all(binary_out_directory)
         .unwrap_or_else(|_| panic!("Failed to create parent directories for component {}", name));
 
-    fs::copy(component_binary_path, build_config.out)
-        .unwrap_or_else(|_| panic!("Failed to copy binary for component {}", name));
+    fs::copy(&component_binary_path, &binary_out).unwrap_or_else(|_| {
+        panic!(
+            "Failed to copy {} to {}",
+            component_binary_path.display(),
+            binary_out.display()
+        )
+    });
 
     println!("Finished building {}", name);
 }
