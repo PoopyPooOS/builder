@@ -53,11 +53,12 @@ fn main() {
 
     let subtask_group = Group::new().with_indent(1).shared();
 
-    let subtasks = (0..components.len() - 1)
+    let subtasks = (0..components.len())
         .map(|i| {
-            Line::new(dots.clone())
-                .with_text(&format!("Building {}", components[i].file_name().to_str().unwrap()))
-                .shared()
+            let name = components[i].file_name();
+            let name = name.to_str().unwrap();
+
+            Line::new(dots.clone()).with_text(&format!("Building {}", name)).shared()
         })
         .collect::<Vec<_>>();
 
@@ -66,7 +67,7 @@ fn main() {
 
     let config = Arc::new(config);
     subtasks.par_iter().enumerate().for_each(|(i, subtask)| {
-        let component = &components[i + 1];
+        let component = &components[i];
         let config = Arc::clone(&config);
 
         let name = component.file_name();

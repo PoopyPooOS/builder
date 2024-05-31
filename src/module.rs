@@ -8,6 +8,7 @@ pub struct ModuleConfig {
     descrtiption: String,
 }
 
+#[allow(dead_code)]
 pub fn parse_module(module_path: PathBuf) -> io::Result<ModuleConfig> {
     let module_config_raw = fs::read_to_string(module_path.join("module.toml"))?;
 
