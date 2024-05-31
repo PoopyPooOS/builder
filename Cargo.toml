@@ -4,5 +4,8 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+colored = "2.1.0"
+rayon = "1.10.0"
 serde = { version = "1.0.200", features = ["derive"] }
+termspin = "0.1.0"
 toml = "0.8.12"

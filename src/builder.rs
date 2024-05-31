@@ -15,8 +15,7 @@ struct ComponentConfig {
     binary_path: Option<String>,
 }
 
-pub fn build(name: &str, config: Config) {
-    println!("Building {}", name);
+pub fn build(name: &str, config: &Config) {
     let cwd = current_dir().expect("Failed to get current directory");
     let component_path = {
         let mut ancestors = cwd.ancestors();
@@ -25,8 +24,10 @@ pub fn build(name: &str, config: Config) {
         path.join(&config.components_dir).join(name)
     };
 
-    if component_path.is_file() {
-        return;
+    let is_module = component_path.join("module.toml").exists();
+
+    if is_module {
+        return build_module(name, component_path, config);
     }
 
     let build_args = match config.build_type {
@@ -34,26 +35,16 @@ pub fn build(name: &str, config: Config) {
         BuildType::Release => vec!["build", "--release"],
     };
 
-    let output = Command::new("/usr/bin/cargo")
+    Command::new("/usr/bin/cargo")
         .args(build_args)
         .current_dir(&component_path)
         .output()
         .expect("Failed to execute 'cargo build'");
 
-    if output.status.success() {
-        println!("Binaries for {} built successfully", name);
-    } else {
-        println!("Binaries for {} failed to build", name);
-        if let Ok(stderr) = String::from_utf8(output.stderr) {
-            println!("Build error output: {}", stderr);
-        }
-    }
-
     let build_config = {
-        let raw_toml = fs::read_to_string(component_path.join("build.toml"))
-            .expect("Failed to read build config");
-        let parsed: ComponentConfig =
-            toml::from_str(&raw_toml).expect("Failed to parse build config");
+        let raw_toml = fs::read_to_string(component_path.join("build.toml")).expect("Failed to read build config");
+        let parsed: ComponentConfig = toml::from_str(&raw_toml).expect("Failed to parse build config");
+
         parsed
     };
 
@@ -63,23 +54,18 @@ pub fn build(name: &str, config: Config) {
             BuildType::Release => component_path.join(format!("target/release/{}", name)),
         }
     } else {
-        change_root(
-            PathBuf::from(&build_config.binary_path.unwrap()),
-            component_path,
-        )
+        change_root(PathBuf::from(&build_config.binary_path.unwrap()), component_path)
     };
 
     // Some components might use /dev/null as their output which means they should not be copied.
     let binary_out = if build_config.out == "/dev/null" {
         return;
     } else {
-        change_root(
-            PathBuf::from(&build_config.out),
-            PathBuf::from(&config.rootfs_dir),
-        )
+        change_root(PathBuf::from(&build_config.out), PathBuf::from(&config.rootfs_dir))
     };
 
     let binary_out_directory = binary_out.parent().unwrap();
+    // subtask.lock().set_text(format!("Copying {} to rootfs", name).as_str());
 
     fs::create_dir_all(binary_out_directory)
         .unwrap_or_else(|_| panic!("Failed to create parent directories for component {}", name));
@@ -91,8 +77,10 @@ pub fn build(name: &str, config: Config) {
             binary_out.display()
         )
     });
+}
 
-    println!("Finished building {}", name);
+fn build_module(_name: &str, _component_path: PathBuf, _config: &Config) {
+    todo!()
 }
 
 pub fn change_root(path: PathBuf, new_root: PathBuf) -> PathBuf {

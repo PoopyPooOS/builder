@@ -1,13 +1,20 @@
 #![feature(ascii_char)]
 
+use colored::{Color, Colorize};
+use rayon::iter::{IndexedParallelIterator, IntoParallelRefIterator, ParallelIterator};
 use serde::Deserialize;
 use std::{
-    fs,
-    process::{Command, Stdio},
+    fs, io,
+    process::{self, Command, Stdio},
+    sync::Arc,
     thread,
+    time::Duration,
 };
+use termspin::{Group, Line, Loop, SharedFrames};
 
 mod builder;
+mod module;
+mod spinner;
 
 #[derive(Debug, Clone, Deserialize)]
 struct Config {
@@ -18,13 +25,11 @@ struct Config {
     qemu_args: Vec<String>,
 }
 
-const DISTRO_NAME: &str = "PoopyPooOS";
 const BUILDER_CONFIG_NAME: &str = "builder.toml";
 
 fn main() {
     let config = {
-        let config_raw =
-            fs::read_to_string(BUILDER_CONFIG_NAME).expect("Failed to read config file");
+        let config_raw = fs::read_to_string(BUILDER_CONFIG_NAME).expect("Failed to read config file");
         let parsed: Config = toml::from_str(&config_raw).expect("Failed to parse config");
 
         parsed
@@ -33,79 +38,90 @@ fn main() {
     let components = fs::read_dir(&config.components_dir)
         .unwrap()
         .map(|f| f.unwrap())
+        .filter(|f| f.file_type().unwrap().is_dir())
         .collect::<Vec<_>>();
 
-    let handles: Vec<_> = components
-        .into_iter()
-        .map(|component| {
-            let config = config.clone();
+    let dots = spinner::dots();
+    let main_group = Group::new();
+    let main_group = SharedFrames::new(main_group);
+    let spin_loop = Loop::new(Duration::from_millis(80), main_group.clone());
+    let spin_loop_clone = spin_loop.clone();
+    thread::spawn(move || spin_loop_clone.run_stream(io::stdout()));
 
-            thread::spawn(move || {
-                builder::build(component.file_name().to_str().unwrap(), config);
-            })
+    let compiling_task = Line::new(dots.clone()).with_text("Building components").shared();
+    main_group.lock().push(compiling_task.clone());
+
+    let subtask_group = Group::new().with_indent(1).shared();
+
+    let subtasks = (0..components.len() - 1)
+        .map(|i| {
+            Line::new(dots.clone())
+                .with_text(&format!("Building {}", components[i].file_name().to_str().unwrap()))
+                .shared()
         })
-        .collect();
+        .collect::<Vec<_>>();
 
-    for handle in handles {
-        match handle.join() {
-            Ok(_) => (),
-            Err(err) => {
-                if let Some(panic_message) = err.downcast_ref::<&str>() {
-                    println!("Build thread panicked with message: {}", panic_message);
-                } else {
-                    println!("Build thread panicked with an unknown message.");
-                }
-            }
-        }
-    }
+    subtask_group.lock().extend(subtasks.iter().cloned());
+    main_group.lock().push(subtask_group.clone());
 
-    println!("\nAll components built successfully!\n");
-    println!("Building initrd...");
+    let config = Arc::new(config);
+    subtasks.par_iter().enumerate().for_each(|(i, subtask)| {
+        let component = &components[i + 1];
+        let config = Arc::clone(&config);
 
+        let name = component.file_name();
+        let name = name.to_str().unwrap();
+
+        builder::build(name, &config);
+
+        subtask
+            .lock()
+            .set_spinner_visible(false)
+            .set_text(&format!("{} Finished building {}", "✓".color(Color::Green), name));
+    });
+
+    compiling_task
+        .lock()
+        .set_spinner_visible(false)
+        .set_text(format!("{} Finished building all components", "✓".color(Color::Green)).as_str());
+
+    drop(compiling_task);
+    drop(subtask_group);
+
+    println!();
+
+    let initrd_task = Line::new(dots.clone()).with_text("Building components").shared();
+    main_group.lock().push(initrd_task.clone());
     let initrd = Command::new("sh")
-        .args([
-            "-c",
-            &format!("find . | cpio -o -H newc > {}/initrd", config.dist_dir),
-        ])
-        .current_dir(config.rootfs_dir)
+        .args(["-c", &format!("find . | cpio -o -H newc > {}/initrd", config.dist_dir)])
+        .current_dir(&config.rootfs_dir)
         .output()
         .expect("Failed to create initrd");
 
     if initrd.status.success() {
-        println!("Successfully created initrd!");
+        initrd_task
+            .lock()
+            .set_spinner_visible(false)
+            .set_text(format!("{} Finished building initrd", "✓".color(Color::Green)).as_str());
     } else {
-        panic!("Failed to create initrd");
+        initrd_task
+            .lock()
+            .set_spinner_visible(false)
+            .set_text(format!("{} There was an error building the initrd.", "✖".color(Color::Red)).as_str());
+
+        process::exit(1);
     }
 
-    println!("Starting {} with qemu-system-x86_64", DISTRO_NAME);
     let mut qemu = Command::new("qemu-system-x86_64")
         .args(["-kernel", &format!("{}/kernel", config.dist_dir)])
         .args(["-initrd", &format!("{}/initrd", config.dist_dir)])
-        .args(config.qemu_args)
+        .args(&config.qemu_args)
         .current_dir("..")
         .stdout(Stdio::inherit())
         .stderr(Stdio::inherit())
         .stdin(Stdio::inherit())
         .spawn()
-        .unwrap_or_else(|_| panic!("Failed to start {} using qemu", DISTRO_NAME));
+        .unwrap_or_else(|_| panic!("Failed to start qemu"));
 
     qemu.wait().unwrap();
-}
-
-#[cfg(test)]
-mod tests {
-    use std::path::PathBuf;
-
-    use super::*;
-
-    #[test]
-    fn test_change_root() {
-        assert_eq!(
-            builder::change_root(
-                PathBuf::from("/init"),
-                PathBuf::from("/home/real/projects/distro2/rootfs"),
-            ),
-            PathBuf::from("/home/real/projects/distro2/rootfs/init")
-        );
-    }
 }
