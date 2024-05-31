@@ -1,5 +1,10 @@
 use serde::Deserialize;
-use std::{env::current_dir, fs, path::PathBuf, process::Command};
+use std::{
+    env::current_dir,
+    fs::{self, DirEntry},
+    path::PathBuf,
+    process::Command,
+};
 
 use crate::Config;
 
@@ -27,7 +32,7 @@ pub fn build(name: &str, config: &Config) {
     let is_module = component_path.join("module.toml").exists();
 
     if is_module {
-        return build_module(name, component_path, config);
+        return build_module(component_path, config);
     }
 
     let build_args = match config.build_type {
@@ -79,8 +84,20 @@ pub fn build(name: &str, config: &Config) {
     });
 }
 
-fn build_module(_name: &str, _component_path: PathBuf, _config: &Config) {
-    todo!()
+fn build_module(module_path: PathBuf, config: &Config) {
+    let module_components: Vec<DirEntry> = fs::read_dir(&module_path)
+        .expect("Failed to read module directory")
+        .filter_map(Result::ok)
+        .filter(|file| file.file_type().unwrap().is_dir())
+        .collect();
+
+    let mut new_config = config.clone();
+    new_config.components_dir = module_path.display().to_string();
+
+    for component in module_components {
+        let component_name = component.file_name().to_str().unwrap().to_string();
+        build(&component_name, &new_config);
+    }
 }
 
 pub fn change_root(path: PathBuf, new_root: PathBuf) -> PathBuf {
