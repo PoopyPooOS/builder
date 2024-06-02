@@ -91,10 +91,13 @@ fn main() {
 
     println!();
 
-    let initrd_task = Line::new(dots.clone()).with_text("Building components").shared();
+    let initrd_task = Line::new(dots.clone()).with_text("Building initrd").shared();
     main_group.lock().push(initrd_task.clone());
     let initrd = Command::new("sh")
-        .args(["-c", &format!("find . | cpio -o -H newc > {}/initrd", config.dist_dir)])
+        .args([
+            "-c",
+            &format!("find . | cpio -o -H newc > {}/iso/boot/initrd", config.dist_dir),
+        ])
         .current_dir(&config.rootfs_dir)
         .output()
         .expect("Failed to create initrd");
@@ -113,11 +116,39 @@ fn main() {
         process::exit(1);
     }
 
+    drop(initrd_task);
+
+    let iso_task = Line::new(dots.clone()).with_text("Building ISO").shared();
+    main_group.lock().push(iso_task.clone());
+
+    let grub_mkrescue = Command::new("grub-mkrescue")
+        .args(["-o", &format!("{}/PoopyPooOS.iso", config.dist_dir)])
+        .arg(&format!("{}/iso", config.dist_dir))
+        .current_dir(&config.dist_dir)
+        .output()
+        .expect("Failed to create ISO with grub-mkrescue");
+
+    if grub_mkrescue.status.success() {
+        iso_task
+            .lock()
+            .set_spinner_visible(false)
+            .set_text(format!("{} Finished building ISO", "✓".color(Color::Green)).as_str());
+    } else {
+        iso_task
+            .lock()
+            .set_spinner_visible(false)
+            .set_text(format!("{} There was an error building the ISO.", "✖".color(Color::Red)).as_str());
+
+        process::exit(1);
+    }
+
+    drop(iso_task);
+    drop(main_group);
+    drop(dots);
+
     let mut qemu = Command::new("qemu-system-x86_64")
-        .args(["-kernel", &format!("{}/kernel", config.dist_dir)])
-        .args(["-initrd", &format!("{}/initrd", config.dist_dir)])
+        .args(["-cdrom", &format!("{}/PoopyPooOS.iso", config.dist_dir)])
         .args(&config.qemu_args)
-        .current_dir("..")
         .stdout(Stdio::inherit())
         .stderr(Stdio::inherit())
         .stdin(Stdio::inherit())
