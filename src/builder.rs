@@ -70,7 +70,6 @@ pub fn build(name: &str, config: &Config) {
     };
 
     let binary_out_directory = binary_out.parent().unwrap();
-    // subtask.lock().set_text(format!("Copying {} to rootfs", name).as_str());
 
     fs::create_dir_all(binary_out_directory)
         .unwrap_or_else(|_| panic!("Failed to create parent directories for component {}", name));
