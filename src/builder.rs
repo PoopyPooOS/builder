@@ -40,7 +40,7 @@ pub fn build(name: &str, config: &Config) {
         BuildType::Release => vec!["build", "--release"],
     };
 
-    Command::new("/usr/bin/cargo")
+    Command::new("cargo")
         .args(build_args)
         .current_dir(&component_path)
         .output()
@@ -71,16 +71,10 @@ pub fn build(name: &str, config: &Config) {
 
     let binary_out_directory = binary_out.parent().unwrap();
 
-    fs::create_dir_all(binary_out_directory)
-        .unwrap_or_else(|_| panic!("Failed to create parent directories for component {}", name));
+    fs::create_dir_all(binary_out_directory).unwrap_or_else(|_| panic!("Failed to create parent directories for component {}", name));
 
-    fs::copy(&component_binary_path, &binary_out).unwrap_or_else(|_| {
-        panic!(
-            "Failed to copy {} to {}",
-            component_binary_path.display(),
-            binary_out.display()
-        )
-    });
+    fs::copy(&component_binary_path, &binary_out)
+        .unwrap_or_else(|_| panic!("Failed to copy {} to {}", component_binary_path.display(), binary_out.display()));
 }
 
 fn build_module(module_path: PathBuf, config: &Config) {
