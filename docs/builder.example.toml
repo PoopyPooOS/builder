@@ -12,3 +12,6 @@ dist_dir = "/path/to/dist"
 
 # QEMU launch arguments
 qemu_args = ["-m", "512M", "-append", "loglevel=3", "-enable-kvm", "-smp", "2"]
+
+# Kernel args (when launching with qemu)
+kernel_args = "loglevel=3"
