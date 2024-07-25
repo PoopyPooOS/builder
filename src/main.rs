@@ -35,6 +35,7 @@ struct Cli {
 
 const BUILDER_CONFIG_NAME: &str = "builder.toml";
 
+#[allow(clippy::too_many_lines)]
 fn main() {
     let args = Cli::parse();
 
@@ -68,7 +69,7 @@ fn main() {
             let name = components[i].file_name();
             let name = name.to_str().unwrap();
 
-            Line::new(dots.clone()).with_text(&format!("Building {}", name)).shared()
+            Line::new(dots.clone()).with_text(&format!("Building {name}")).shared()
         })
         .collect::<Vec<_>>();
 

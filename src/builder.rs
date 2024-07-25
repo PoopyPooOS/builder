@@ -2,7 +2,7 @@ use serde::Deserialize;
 use std::{
     env::current_dir,
     fs::{self, DirEntry},
-    path::PathBuf,
+    path::{Path, PathBuf},
     process::Command,
 };
 
@@ -32,7 +32,7 @@ pub fn build(name: &str, config: &Config) {
     let is_module = component_path.join("module.toml").exists();
 
     if is_module {
-        return build_module(component_path, config);
+        return build_module(&component_path, config);
     }
 
     let build_args = match config.build_type {
@@ -55,30 +55,30 @@ pub fn build(name: &str, config: &Config) {
 
     let component_binary_path: PathBuf = if build_config.binary_path.is_none() {
         match config.build_type {
-            BuildType::Debug => component_path.join(format!("target/debug/{}", name)),
-            BuildType::Release => component_path.join(format!("target/release/{}", name)),
+            BuildType::Debug => component_path.join(format!("target/debug/{name}")),
+            BuildType::Release => component_path.join(format!("target/release/{name}")),
         }
     } else {
-        change_root(PathBuf::from(&build_config.binary_path.unwrap()), component_path)
+        change_root(&PathBuf::from(&build_config.binary_path.unwrap()), &component_path)
     };
 
     // Some components might use /dev/null as their output which means they should not be copied.
     let binary_out = if build_config.out == "/dev/null" {
         return;
     } else {
-        change_root(PathBuf::from(&build_config.out), PathBuf::from(&config.rootfs_dir))
+        change_root(&PathBuf::from(&build_config.out), &PathBuf::from(&config.rootfs_dir))
     };
 
     let binary_out_directory = binary_out.parent().unwrap();
 
-    fs::create_dir_all(binary_out_directory).unwrap_or_else(|_| panic!("Failed to create parent directories for component {}", name));
+    fs::create_dir_all(binary_out_directory).unwrap_or_else(|_| panic!("Failed to create parent directories for component {name}"));
 
     fs::copy(&component_binary_path, &binary_out)
         .unwrap_or_else(|_| panic!("Failed to copy {} to {}", component_binary_path.display(), binary_out.display()));
 }
 
-fn build_module(module_path: PathBuf, config: &Config) {
-    let module_components: Vec<DirEntry> = fs::read_dir(&module_path)
+fn build_module(module_path: &Path, config: &Config) {
+    let module_components: Vec<DirEntry> = fs::read_dir(module_path)
         .expect("Failed to read module directory")
         .filter_map(Result::ok)
         .filter(|file| file.file_type().unwrap().is_dir())
@@ -93,7 +93,7 @@ fn build_module(module_path: PathBuf, config: &Config) {
     }
 }
 
-pub fn change_root(path: PathBuf, new_root: PathBuf) -> PathBuf {
+pub fn change_root(path: &Path, new_root: &Path) -> PathBuf {
     let relative_path = path.strip_prefix("/").unwrap();
     new_root.join(relative_path)
 }
