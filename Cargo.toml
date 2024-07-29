@@ -1,15 +1,15 @@
 [package]
 name = "builder"
-version = "0.1.0"
+version = "1.0.0"
 edition = "2021"
 
 [dependencies]
 clap = { version = "4.5.7", features = ["derive"] }
+serde = { version = "1.0.200", features = ["derive"] }
 colored = "2.1.0"
 rayon = "1.10.0"
-serde = { version = "1.0.200", features = ["derive"] }
-termspin = "0.1.0"
 toml = "0.8.12"
+strum = { version = "0.26.3", features = ["derive"] }
 
 [profile.release]
 opt-level = "z"
