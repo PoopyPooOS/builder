@@ -75,18 +75,13 @@ pub struct Component {
     pub name: String,
     pub path: PathBuf,
     pub component_type: ComponentType,
+
+    pub config: Option<toml::Table>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum ComponentType {
-    Binary(BinaryComponentConfig),
+    Binary,
     Module,
     Other,
-}
-
-#[derive(Debug, Default, Deserialize)]
-pub struct BinaryComponentConfig {
-    pub out: PathBuf,
-    #[serde(default)]
-    pub build_type: BuildType,
 }

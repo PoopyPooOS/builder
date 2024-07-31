@@ -1,11 +1,11 @@
-use crate::types::{BinaryComponentConfig, Component, ComponentType};
+use crate::types::{Component, ComponentType};
 use serde::de::DeserializeOwned;
 use std::{
     fs, io,
     path::{Path, PathBuf},
 };
 
-pub fn read_components(path: &Path) -> io::Result<Vec<Component>> {
+fn single_read_components(path: &Path) -> io::Result<Vec<Component>> {
     Ok(fs::read_dir(path)?
         .filter_map(|entry| entry.ok().and_then(|e| if e.file_type().ok()?.is_dir() { Some(e) } else { None }))
         .filter(|entry| {
@@ -15,22 +15,47 @@ pub fn read_components(path: &Path) -> io::Result<Vec<Component>> {
                 .expect("Failed to get component name")
                 .starts_with(".")
         })
-        .map(|component| {
-            let component_type: ComponentType = match &component {
-                e if e.path().join("build.toml").exists() => {
-                    ComponentType::Binary(parse::<BinaryComponentConfig>(e.path().join("build.toml")))
-                }
-                e if e.path().join("module.toml").exists() => ComponentType::Module,
-                _ => ComponentType::Other,
-            };
-
-            Component {
+        .map(|component| match &component {
+            e if e.path().join("build.toml").exists() => Component {
                 name: component.file_name().into_string().expect("Failed to get component name"),
                 path: component.path(),
-                component_type,
-            }
+                component_type: ComponentType::Binary,
+
+                config: Some(parse::<toml::Table>(e.path().join("build.toml"))),
+            },
+            e if e.path().join("module.toml").exists() => Component {
+                name: component.file_name().into_string().expect("Failed to get component name"),
+                path: component.path(),
+                component_type: ComponentType::Module,
+
+                config: None,
+            },
+            _ => Component {
+                name: component.file_name().into_string().expect("Failed to get component name"),
+                path: component.path(),
+                component_type: ComponentType::Other,
+
+                config: None,
+            },
         })
         .collect::<Vec<_>>())
+}
+
+pub fn read_components(path: &Path) -> io::Result<Vec<Component>> {
+    let mut components = single_read_components(path)?;
+
+    components = components
+        .into_iter()
+        .flat_map(|component| {
+            if component.component_type == ComponentType::Module {
+                single_read_components(&component.path).unwrap_or_else(|_| Vec::new())
+            } else {
+                vec![component]
+            }
+        })
+        .collect();
+
+    Ok(components)
 }
 
 pub fn parse<T: DeserializeOwned>(path: impl Into<PathBuf>) -> T {
