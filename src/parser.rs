@@ -1,8 +1,10 @@
 use crate::types::{Component, ComponentType};
 use serde::de::DeserializeOwned;
+use serde_json::Value;
 use std::{
     fs, io,
     path::{Path, PathBuf},
+    process::Command,
 };
 
 fn single_read_components(path: &Path) -> io::Result<Vec<Component>> {
@@ -41,6 +43,24 @@ fn single_read_components(path: &Path) -> io::Result<Vec<Component>> {
         .collect::<Vec<_>>())
 }
 
+fn get_component_name(component: &Component) -> String {
+    let output = Command::new("cargo")
+        .args(&["metadata", "--no-deps", "--format-version", "1"])
+        .current_dir(&component.path)
+        .output()
+        .expect("Failed to execute cargo metadata");
+
+    // Parse the JSON output
+    let metadata: Value = serde_json::from_slice(&output.stdout).expect("Failed to parse JSON");
+
+    // Extract and print the package names
+    if let Some(packages) = metadata.get("packages").and_then(|p| p.as_array()) {
+        println!("{:#?}", &packages[0]);
+    }
+
+    String::default()
+}
+
 pub fn read_components(path: &Path) -> io::Result<Vec<Component>> {
     let mut components = single_read_components(path)?;
 
@@ -54,6 +74,10 @@ pub fn read_components(path: &Path) -> io::Result<Vec<Component>> {
             }
         })
         .collect();
+
+    components.iter_mut().for_each(|component| {
+        component.name = get_component_name(component);
+    });
 
     Ok(components)
 }

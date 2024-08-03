@@ -1,14 +1,21 @@
 use clap::Parser;
 use types::{Cli, Command, Config};
+use which::which;
 
 mod builder;
 mod parser;
 mod runner;
 mod types;
+mod utils;
 
 fn main() {
-    let command = Cli::parse().command();
+    ["cargo", "qemu-system-x86_64", "sh", "find", "cpio", "grub-mkrescue"]
+        .iter()
+        .for_each(|dep| {
+            which(dep).expect(format!("{} not installed", dep).as_str());
+        });
 
+    let command = Cli::parse().command();
     let config: Config = parser::parse("builder.toml");
 
     match command {

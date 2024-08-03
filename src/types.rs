@@ -1,6 +1,6 @@
 use clap::{Parser, Subcommand};
 use serde::Deserialize;
-use std::path::PathBuf;
+use std::{fmt::Display, path::PathBuf};
 
 #[derive(Debug, Parser)]
 #[command(version, about, long_about = None)]
@@ -70,6 +70,15 @@ pub enum BuildType {
     Release,
 }
 
+impl Display for BuildType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            BuildType::Debug => write!(f, "debug"),
+            BuildType::Release => write!(f, "release"),
+        }
+    }
+}
+
 #[derive(Debug)]
 pub struct Component {
     pub name: String,
@@ -84,4 +93,11 @@ pub enum ComponentType {
     Binary,
     Module,
     Other,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct BinaryComponentConfig {
+    pub out: PathBuf,
+    #[serde(default)]
+    pub build_type: BuildType,
 }
