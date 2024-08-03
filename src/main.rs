@@ -11,8 +11,6 @@ fn main() {
 
     let config: Config = parser::parse("builder.toml");
 
-    // Will have multiple matches later
-    #[allow(clippy::single_match)]
     match command {
         Command::Run { iso } | Command::R { iso } => {
             runner::run(&config, iso.unwrap_or_default());
