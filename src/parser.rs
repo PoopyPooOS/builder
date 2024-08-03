@@ -90,6 +90,6 @@ pub fn read_components(path: &Path) -> io::Result<Vec<Component>> {
 }
 
 pub fn parse<T: DeserializeOwned>(path: impl Into<PathBuf>) -> T {
-    let raw = std::fs::read_to_string(path.into()).expect("Failed to read toml file");
+    let raw = fs::read_to_string(path.into()).expect("Failed to read toml file");
     toml::from_str::<T>(&raw).expect("Failed to parse toml file")
 }

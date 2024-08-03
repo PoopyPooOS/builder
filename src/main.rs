@@ -9,11 +9,17 @@ mod types;
 mod utils;
 
 fn main() {
+    let mut missing: Vec<&str> = vec![];
+
     ["cargo", "qemu-system-x86_64", "sh", "find", "cpio", "grub-mkrescue"]
         .iter()
         .for_each(|dep| {
-            which(dep).expect(format!("{} not installed", dep).as_str());
+            which(dep).is_err().then(|| missing.push(dep));
         });
+
+    if !missing.is_empty() {
+        panic!("Missing dependencies: {}.", missing.join(", "));
+    }
 
     let command = Cli::parse().command();
     let config: Config = parser::parse("builder.toml");
