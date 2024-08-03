@@ -7,7 +7,7 @@ use rayon::prelude::*;
 use std::{
     fs, io,
     path::{Path, PathBuf},
-    process::Command,
+    process::{Command, Stdio},
 };
 
 pub fn build(config: &Config, _iso: bool) -> io::Result<()> {
@@ -39,6 +39,7 @@ fn build_component(component: &Component, target: &str, rootfs_path: &Path) -> i
     Command::new("cargo")
         .args(build_type_args)
         .args(["--target", target])
+        .stderr(Stdio::null())
         .current_dir(&component.path)
         .spawn()
         .expect("Failed to build with cargo")

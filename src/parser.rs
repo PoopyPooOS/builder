@@ -43,22 +43,27 @@ fn single_read_components(path: &Path) -> io::Result<Vec<Component>> {
         .collect::<Vec<_>>())
 }
 
-fn get_component_name(component: &Component) -> String {
+fn get_component_name(component: &Component) -> Option<String> {
     let output = Command::new("cargo")
         .args(&["metadata", "--no-deps", "--format-version", "1"])
         .current_dir(&component.path)
         .output()
         .expect("Failed to execute cargo metadata");
 
-    // Parse the JSON output
     let metadata: Value = serde_json::from_slice(&output.stdout).expect("Failed to parse JSON");
 
-    // Extract and print the package names
     if let Some(packages) = metadata.get("packages").and_then(|p| p.as_array()) {
-        println!("{:#?}", &packages[0]);
+        Some(
+            packages[0]
+                .get("name")
+                .expect("Failed to get component name")
+                .as_str()
+                .unwrap()
+                .to_string(),
+        )
+    } else {
+        None
     }
-
-    String::default()
 }
 
 pub fn read_components(path: &Path) -> io::Result<Vec<Component>> {
@@ -76,7 +81,9 @@ pub fn read_components(path: &Path) -> io::Result<Vec<Component>> {
         .collect();
 
     components.iter_mut().for_each(|component| {
-        component.name = get_component_name(component);
+        if let Some(name) = get_component_name(component) {
+            component.name = name;
+        }
     });
 
     Ok(components)
