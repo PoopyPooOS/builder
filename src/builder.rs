@@ -14,7 +14,7 @@ use std::{
     time::Duration,
 };
 
-pub fn build(config: &Config, _iso: bool) -> io::Result<()> {
+pub fn build(config: &Config, iso: bool) -> io::Result<()> {
     let components = parser::read_components(&config.components_dir)?;
     let mpb = Arc::new(MultiProgress::new());
 
@@ -27,11 +27,9 @@ pub fn build(config: &Config, _iso: bool) -> io::Result<()> {
 
     mpb.clear().expect("Failed to clear progress bars");
 
-    // TODO: Build ISO
-
     let pb = ProgressBar::new_spinner();
     pb.set_style(
-        ProgressStyle::with_template("{spinner:.dim.bold} {job_name}: {wide_msg}")
+        ProgressStyle::with_template("{spinner:.dim.bold} {wide_msg}")
             .unwrap()
             .tick_chars("/|\\- "),
     );
@@ -50,14 +48,35 @@ pub fn build(config: &Config, _iso: bool) -> io::Result<()> {
         .expect("Failed to wait for initrd");
 
     if initrd.success() {
-        pb.finish_with_message("Finished building initrd");
+        if iso {
+            pb.set_message("Finished building initrd");
+        } else {
+            pb.finish_with_message("Finished building initrd");
+            pb.finish_and_clear();
+            return Ok(());
+        }
     } else {
         pb.finish_with_message("Failed to build initrd");
         process::exit(1);
     }
 
-    pb.finish_and_clear();
-    drop(pb);
+    pb.set_message("Building ISO");
+    let iso = Command::new("grub-mkrescue")
+        .args(["-o", &config.dist_dir.join("PoopyPooOS.iso").display().to_string()])
+        .arg(config.dist_dir.join("iso").display().to_string())
+        .stderr(Stdio::null())
+        .current_dir(&config.dist_dir)
+        .spawn()
+        .expect("Failed to create ISO")
+        .wait()
+        .expect("Failed to wait for ISO creation");
+
+    if iso.success() {
+        pb.finish_with_message("Finished building ISO");
+    } else {
+        pb.finish_with_message("Failed to build ISO");
+        process::exit(1);
+    }
 
     Ok(())
 }
