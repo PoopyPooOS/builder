@@ -42,6 +42,7 @@ pub fn build(config: &Config, _iso: bool) -> io::Result<()> {
             "-c",
             &format!("find . | cpio -o -H newc > {}", config.dist_dir.join("iso/boot/initrd").display()),
         ])
+        .stderr(Stdio::null())
         .current_dir(&config.rootfs_dir)
         .spawn()
         .expect("Failed to create initrd")
@@ -55,6 +56,7 @@ pub fn build(config: &Config, _iso: bool) -> io::Result<()> {
         process::exit(1);
     }
 
+    pb.finish_and_clear();
     drop(pb);
 
     Ok(())
