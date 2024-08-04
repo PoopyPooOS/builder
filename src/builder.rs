@@ -9,14 +9,13 @@ use std::{
     fs,
     io::{self, BufRead, BufReader},
     path::{Path, PathBuf},
-    process::{Command, Stdio},
+    process::{self, Command, Stdio},
     sync::Arc,
     time::Duration,
 };
 
 pub fn build(config: &Config, _iso: bool) -> io::Result<()> {
     let components = parser::read_components(&config.components_dir)?;
-
     let mpb = Arc::new(MultiProgress::new());
 
     components
@@ -28,7 +27,35 @@ pub fn build(config: &Config, _iso: bool) -> io::Result<()> {
 
     mpb.clear().expect("Failed to clear progress bars");
 
-    // TODO: Build initrd and ISO
+    // TODO: Build ISO
+
+    let pb = ProgressBar::new_spinner();
+    pb.set_style(
+        ProgressStyle::with_template("{spinner:.dim.bold} {job_name}: {wide_msg}")
+            .unwrap()
+            .tick_chars("/|\\- "),
+    );
+    pb.enable_steady_tick(Duration::from_millis(200));
+    pb.set_message("Building initrd");
+    let initrd = Command::new("sh")
+        .args([
+            "-c",
+            &format!("find . | cpio -o -H newc > {}", config.dist_dir.join("iso/boot/initrd").display()),
+        ])
+        .current_dir(&config.rootfs_dir)
+        .spawn()
+        .expect("Failed to create initrd")
+        .wait()
+        .expect("Failed to wait for initrd");
+
+    if initrd.success() {
+        pb.finish_with_message("Finished building initrd");
+    } else {
+        pb.finish_with_message("Failed to build initrd");
+        process::exit(1);
+    }
+
+    drop(pb);
 
     Ok(())
 }
