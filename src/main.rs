@@ -26,7 +26,7 @@ fn main() {
 
     match command {
         Command::Run { iso } | Command::R { iso } => {
-            runner::run(&config, iso.unwrap_or_default());
+            runner::run(&config, iso);
         }
         Command::Build { no_run, iso } | Command::B { no_run, iso } => {
             builder::build(&config, iso).expect("Build failed");

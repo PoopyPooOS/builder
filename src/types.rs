@@ -10,8 +10,8 @@ pub struct Cli {
 }
 
 impl Cli {
-    pub fn command(&self) -> Command {
-        self.command.clone().unwrap_or_default()
+    pub fn command(&mut self) -> Command {
+        self.command.take().unwrap_or_default()
     }
 }
 
@@ -19,22 +19,22 @@ impl Cli {
 pub enum Command {
     Run {
         #[arg(long)]
-        iso: Option<bool>,
+        iso: bool,
     },
     R {
         #[arg(long)]
-        iso: Option<bool>,
+        iso: bool,
     },
     Build {
-        #[arg(long)]
+        #[arg(short, long)]
         no_run: bool,
-        #[arg(long)]
+        #[arg(short, long)]
         iso: bool,
     },
     B {
-        #[arg(long)]
+        #[arg(short, long)]
         no_run: bool,
-        #[arg(long)]
+        #[arg(short, long)]
         iso: bool,
     },
     Add {
