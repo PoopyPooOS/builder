@@ -15,7 +15,7 @@ impl Cli {
     }
 }
 
-#[derive(Debug, Clone, Subcommand)]
+#[derive(Debug, Subcommand)]
 pub enum Command {
     Run {
         #[arg(long)]
@@ -37,14 +37,6 @@ pub enum Command {
         #[arg(short, long)]
         iso: bool,
     },
-    Add {
-        name: String,
-        out: PathBuf,
-    },
-    A {
-        name: String,
-        out: PathBuf,
-    },
 }
 
 impl Default for Command {
@@ -55,12 +47,23 @@ impl Default for Command {
 
 #[derive(Debug, Deserialize)]
 pub struct Config {
+    pub builder: BuilderConfig,
+    pub runner: RunnerConfig,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct BuilderConfig {
     pub build_target: String,
     pub components_dir: PathBuf,
     pub rootfs_dir: PathBuf,
     pub dist_dir: PathBuf,
-    pub qemu_args: Vec<String>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct RunnerConfig {
     pub kernel_args: String,
+    pub qemu_bin: Option<PathBuf>,
+    pub qemu_args: Option<Vec<String>>,
 }
 
 #[derive(Debug, Default, Deserialize)]
@@ -83,6 +86,7 @@ impl Display for BuildType {
 pub struct Component {
     pub name: String,
     pub path: PathBuf,
+    #[allow(clippy::struct_field_names)]
     pub component_type: ComponentType,
 
     pub config: Option<toml::Table>,

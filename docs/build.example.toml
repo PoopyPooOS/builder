@@ -1,4 +1,5 @@
 # Where in the rootfs to place the binary
 out = "/init"
-# (optional) The path to where the compiled binary is located
-binary_path = "/target/x86_64-unknown-linux-gnu/release/init"
+
+# (optional, default = "debug") Build type (can only be "Release" or "Debug")
+build_type = "debug"

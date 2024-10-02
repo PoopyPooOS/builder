@@ -1,17 +1,31 @@
+# All the paths in the builder category have to be absolute
+[builder]
 # Build type (can only be "Release" or "Debug")
-build_type = "Release"
+build_target = "x86_64-unknown-linux-musl"
 
-# Directory for components (needs to be an absolute path)
+# Directory for components
 components_dir = "/path/to/userspace"
 
-# Directory for root file system (needs to be an absolute path)
+# Directory for root file system
 rootfs_dir = "/path/to/rootfs"
 
-# Directory for distribution (needs to be an absolute path)
+# Build directory
 dist_dir = "/path/to/dist"
 
-# QEMU launch arguments
-qemu_args = ["-m", "512M", "-append", "loglevel=3", "-enable-kvm", "-smp", "2"]
-
-# Kernel args (when launching with qemu)
+[runner]
+# Kernel args for QEMU to use
 kernel_args = "loglevel=3"
+# QEMU launch arguments
+qemu_args = [
+    "-enable-kvm",
+    "-m",
+    "512M",
+    "-smp",
+    "2",
+    "-display",
+    "gtk,zoom-to-fit=off",
+    "-device",
+    "virtio-gpu",
+    "-hda",
+    "/home/real/projects/distro2/dist/storage.qcow2",
+]

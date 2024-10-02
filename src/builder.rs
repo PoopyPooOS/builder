@@ -15,14 +15,14 @@ use std::{
 };
 
 pub fn build(config: &Config, iso: bool) -> io::Result<()> {
-    let components = parser::read_components(&config.components_dir)?;
+    let components = parser::read_components(&config.builder.components_dir)?;
     let mpb = Arc::new(MultiProgress::new());
 
     components
         .par_iter()
         .filter(|component| component.component_type == ComponentType::Binary)
         .for_each(|component| {
-            build_component(&mpb, component, &config.build_target, &config.rootfs_dir).expect("Failed to compile component")
+            build_component(&mpb, component, &config.builder.build_target, &config.builder.rootfs_dir);
         });
 
     mpb.clear().expect("Failed to clear progress bars");
@@ -38,10 +38,13 @@ pub fn build(config: &Config, iso: bool) -> io::Result<()> {
     let initrd = Command::new("sh")
         .args([
             "-c",
-            &format!("find . | cpio -o -H newc > {}", config.dist_dir.join("iso/boot/initrd").display()),
+            &format!(
+                "find . | cpio -o -H newc > {}",
+                config.builder.dist_dir.join("iso/boot/initrd").display()
+            ),
         ])
         .stderr(Stdio::null())
-        .current_dir(&config.rootfs_dir)
+        .current_dir(&config.builder.rootfs_dir)
         .spawn()
         .expect("Failed to create initrd")
         .wait()
@@ -62,10 +65,10 @@ pub fn build(config: &Config, iso: bool) -> io::Result<()> {
 
     pb.set_message("Building ISO");
     let iso = Command::new("grub-mkrescue")
-        .args(["-o", &config.dist_dir.join("PoopyPooOS.iso").display().to_string()])
-        .arg(config.dist_dir.join("iso").display().to_string())
+        .args(["-o", &config.builder.dist_dir.join("PoopyPooOS.iso").display().to_string()])
+        .arg(config.builder.dist_dir.join("iso").display().to_string())
         .stderr(Stdio::null())
-        .current_dir(&config.dist_dir)
+        .current_dir(&config.builder.dist_dir)
         .spawn()
         .expect("Failed to create ISO")
         .wait()
@@ -81,15 +84,13 @@ pub fn build(config: &Config, iso: bool) -> io::Result<()> {
     Ok(())
 }
 
-fn build_component(mpb: &Arc<MultiProgress>, component: &Component, target: &str, rootfs_path: &Path) -> io::Result<()> {
-    if component.config.is_none() {
-        panic!("Missing config for component: {}", component.name);
-    }
+fn build_component(mpb: &Arc<MultiProgress>, component: &Component, target: &str, rootfs_path: &Path) {
+    assert!(component.config.is_some(), "Missing config for component: {}", component.name);
 
     let config = toml::de::from_str::<BinaryComponentConfig>(&component.config.as_ref().unwrap().to_string())
         .expect("Failed to parse component config");
 
-    compile(&mpb, &component.name, &component.path, &config.build_type, target)?;
+    compile(mpb, &component.name, &component.path, &config.build_type, target);
 
     let build_out = component
         .path
@@ -104,7 +105,7 @@ fn build_component(mpb: &Arc<MultiProgress>, component: &Component, target: &str
     assert!(build_out.exists(), "Failed to build component: {}", component.name);
 
     let binary_out = if config.out == PathBuf::from("/dev/null") {
-        return Ok(());
+        return;
     } else {
         change_root(&config.out, rootfs_path)
     };
@@ -112,11 +113,9 @@ fn build_component(mpb: &Arc<MultiProgress>, component: &Component, target: &str
     let binary_out_directory = binary_out.parent().unwrap();
     fs::create_dir_all(binary_out_directory).expect("Failed to create directory for binary");
     fs::copy(&build_out, &binary_out).expect("Failed to copy binary");
-
-    Ok(())
 }
 
-fn compile(mpb: &Arc<MultiProgress>, job_name: &str, workspace_path: &Path, build_type: &BuildType, target: &str) -> io::Result<()> {
+fn compile(mpb: &Arc<MultiProgress>, job_name: &str, workspace_path: &Path, build_type: &BuildType, target: &str) {
     let build_type_args = match build_type {
         BuildType::Debug => vec!["build"],
         BuildType::Release => vec!["build", "--release"],
@@ -142,13 +141,11 @@ fn compile(mpb: &Arc<MultiProgress>, job_name: &str, workspace_path: &Path, buil
         let line = line.unwrap().trim().to_string();
 
         if !line.is_empty() {
-            pb.set_message(format!("{}: {}", job_name, line));
+            pb.set_message(format!("{job_name}: {line}"));
         }
     }
 
     mpb.add(pb);
 
     cargo.wait().unwrap();
-
-    Ok(())
 }

@@ -15,7 +15,7 @@ fn single_read_components(path: &Path) -> io::Result<Vec<Component>> {
                 .file_name()
                 .into_string()
                 .expect("Failed to get component name")
-                .starts_with(".")
+                .starts_with('.')
         })
         .map(|component| match &component {
             e if e.path().join("build.toml").exists() => Component {
@@ -45,25 +45,21 @@ fn single_read_components(path: &Path) -> io::Result<Vec<Component>> {
 
 fn get_component_name(component: &Component) -> Option<String> {
     let output = Command::new("cargo")
-        .args(&["metadata", "--no-deps", "--format-version", "1"])
+        .args(["metadata", "--no-deps", "--format-version", "1"])
         .current_dir(&component.path)
         .output()
         .expect("Failed to execute cargo metadata");
 
     let metadata: Value = serde_json::from_slice(&output.stdout).expect("Failed to parse JSON");
 
-    if let Some(packages) = metadata.get("packages").and_then(|p| p.as_array()) {
-        Some(
-            packages[0]
-                .get("name")
-                .expect("Failed to get component name")
-                .as_str()
-                .unwrap()
-                .to_string(),
-        )
-    } else {
-        None
-    }
+    metadata.get("packages").and_then(|p| p.as_array()).map(|packages| {
+        packages[0]
+            .get("name")
+            .expect("Failed to get component name")
+            .as_str()
+            .unwrap()
+            .to_string()
+    })
 }
 
 pub fn read_components(path: &Path) -> io::Result<Vec<Component>> {
@@ -80,11 +76,11 @@ pub fn read_components(path: &Path) -> io::Result<Vec<Component>> {
         })
         .collect();
 
-    components.iter_mut().for_each(|component| {
+    for component in &mut components {
         if let Some(name) = get_component_name(component) {
             component.name = name;
         }
-    });
+    }
 
     Ok(components)
 }

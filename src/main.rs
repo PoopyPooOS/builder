@@ -1,4 +1,5 @@
 use clap::Parser;
+use std::{fs, path::PathBuf};
 use types::{Cli, Command, Config};
 use which::which;
 
@@ -11,14 +12,16 @@ mod utils;
 fn main() {
     let mut missing: Vec<&str> = vec![];
 
-    ["cargo", "qemu-system-x86_64", "sh", "find", "cpio", "grub-mkrescue"]
-        .iter()
-        .for_each(|dep| {
-            which(dep).is_err().then(|| missing.push(dep));
-        });
+    for dep in &["cargo", "qemu-system-x86_64", "sh", "find", "cpio", "grub-mkrescue", "gh"] {
+        which(dep).is_err().then(|| missing.push(dep));
+    }
 
-    if !missing.is_empty() {
-        panic!("Missing dependencies: {}.", missing.join(", "));
+    assert!(missing.is_empty(), "Missing dependencies: {}.", missing.join(", "));
+
+    let builder_cache = PathBuf::from(".builder");
+
+    if !builder_cache.exists() {
+        fs::create_dir_all(&builder_cache).expect("Failed to create build tmp dir");
     }
 
     let command = Cli::parse().command();
@@ -35,6 +38,5 @@ fn main() {
                 runner::run(&config, iso);
             }
         }
-        _ => (),
     }
 }
