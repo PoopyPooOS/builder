@@ -1,5 +1,0 @@
-# Where in the rootfs to place the binary
-out = "/init"
-
-# (optional, default = "debug") Build type (can only be "Release" or "Debug")
-build_type = "debug"
