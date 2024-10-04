@@ -1,5 +1,4 @@
 use clap::Parser;
-use std::{fs, path::PathBuf};
 use types::{Cli, Command, Config};
 use which::which;
 
@@ -17,12 +16,6 @@ fn main() {
     }
 
     assert!(missing.is_empty(), "Missing dependencies: {}.", missing.join(", "));
-
-    let builder_cache = PathBuf::from(".builder");
-
-    if !builder_cache.exists() {
-        fs::create_dir_all(&builder_cache).expect("Failed to create build tmp dir");
-    }
 
     let command = Cli::parse().command();
     let config: Config = parser::parse("builder.toml");
