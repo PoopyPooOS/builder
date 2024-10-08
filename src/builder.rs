@@ -90,7 +90,13 @@ fn build_component(mpb: &Arc<MultiProgress>, component: &Component, target: &str
     let config = toml::de::from_str::<BinaryComponentConfig>(&component.config.as_ref().unwrap().to_string())
         .expect("Failed to parse component config");
 
-    compile(mpb, &component.name, &component.path, &config.build_type, target);
+    let target = if let Some(target) = &config.build_target {
+        target
+    } else {
+        &target.to_string()
+    };
+
+    compile(mpb, &component.name, &component.path, &config, &target);
 
     let build_out = component
         .path
@@ -113,10 +119,24 @@ fn build_component(mpb: &Arc<MultiProgress>, component: &Component, target: &str
     let binary_out_directory = binary_out.parent().unwrap();
     fs::create_dir_all(binary_out_directory).expect("Failed to create directory for binary");
     fs::copy(&build_out, &binary_out).expect("Failed to copy binary");
+
+    if !&component.path.join("lib").exists() {
+        return;
+    }
+
+    let libs = fs::read_dir(&component.path.join("lib"))
+        .expect("Failed to read component lib directory")
+        .filter_map(Result::ok)
+        .filter(|f| f.file_name().to_string_lossy().contains(".so"))
+        .collect::<Vec<_>>();
+
+    libs.iter().for_each(|lib| {
+        fs::copy(lib.path(), rootfs_path.join("lib").join(lib.file_name())).expect("Failed to copy library from component");
+    });
 }
 
-fn compile(mpb: &Arc<MultiProgress>, job_name: &str, workspace_path: &Path, build_type: &BuildType, target: &str) {
-    let build_type_args = match build_type {
+fn compile(mpb: &Arc<MultiProgress>, job_name: &str, workspace_path: &Path, config: &BinaryComponentConfig, target: &str) {
+    let build_type_args = match config.build_type {
         BuildType::Debug => vec!["build"],
         BuildType::Release => vec!["build", "--release"],
     };
@@ -129,8 +149,18 @@ fn compile(mpb: &Arc<MultiProgress>, job_name: &str, workspace_path: &Path, buil
             .tick_chars("/|\\- "),
     );
 
+    fs::write("log.txt", workspace_path.join("lib").display().to_string()).expect("failed to log sh");
+
     let mut cargo = Command::new("cargo")
         .args(build_type_args)
+        .env(
+            "LD_LIBRARY_PATH",
+            if workspace_path.join("lib").exists() {
+                workspace_path.join("lib").display().to_string()
+            } else {
+                String::default()
+            },
+        )
         .args(["--target", target])
         .stderr(Stdio::piped())
         .current_dir(workspace_path)

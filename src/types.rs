@@ -104,4 +104,6 @@ pub struct BinaryComponentConfig {
     pub out: PathBuf,
     #[serde(default)]
     pub build_type: BuildType,
+    #[serde(default)]
+    pub build_target: Option<String>,
 }
