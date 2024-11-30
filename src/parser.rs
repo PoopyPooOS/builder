@@ -52,7 +52,7 @@ fn get_component_name(component: &Component) -> Option<String> {
 
     let metadata: Value = serde_json::from_slice(&output.stdout).expect("Failed to parse JSON");
 
-    metadata.get("packages").and_then(|p| p.as_array()).map(|packages| {
+    metadata.get("packages").and_then(Value::as_array).map(|packages| {
         packages[0]
             .get("name")
             .expect("Failed to get component name")

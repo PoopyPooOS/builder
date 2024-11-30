@@ -11,7 +11,7 @@ mod utils;
 fn main() {
     let mut missing: Vec<&str> = vec![];
 
-    for dep in &["cargo", "qemu-system-x86_64", "sh", "find", "cpio", "grub-mkrescue", "gh"] {
+    for dep in ["cargo", "qemu-system-x86_64", "sh", "find", "cpio", "grub-mkrescue"] {
         which(dep).is_err().then(|| missing.push(dep));
     }
 

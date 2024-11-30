@@ -106,4 +106,6 @@ pub struct BinaryComponentConfig {
     pub build_type: BuildType,
     #[serde(default)]
     pub build_target: Option<String>,
+    #[serde(default)]
+    pub post_copy_script: Option<String>,
 }

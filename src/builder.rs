@@ -120,19 +120,37 @@ fn build_component(mpb: &Arc<MultiProgress>, component: &Component, target: &str
     fs::create_dir_all(binary_out_directory).expect("Failed to create directory for binary");
     fs::copy(&build_out, &binary_out).expect("Failed to copy binary");
 
-    if !&component.path.join("lib").exists() {
-        return;
+    if let Some(post_copy_script) = config.post_copy_script {
+        let post_copy_script = format!(
+            "
+            ROOTFS={}
+            OUT={}
+            {}",
+            rootfs_path.display(),
+            config.out.display(),
+            post_copy_script
+        );
+
+        Command::new("sh")
+            .arg("-c")
+            .arg(post_copy_script.trim())
+            .spawn()
+            .expect("Failed to execute post copy script")
+            .wait()
+            .expect("Post copy script failed");
     }
 
-    let libs = fs::read_dir(&component.path.join("lib"))
-        .expect("Failed to read component lib directory")
-        .filter_map(Result::ok)
-        .filter(|f| f.file_name().to_string_lossy().contains(".so"))
-        .collect::<Vec<_>>();
+    if component.path.join("lib").exists() {
+        let libs = fs::read_dir(&component.path.join("lib"))
+            .expect("Failed to read component lib directory")
+            .filter_map(Result::ok)
+            .filter(|f| f.file_name().to_string_lossy().contains(".so"))
+            .collect::<Vec<_>>();
 
-    libs.iter().for_each(|lib| {
-        fs::copy(lib.path(), rootfs_path.join("lib").join(lib.file_name())).expect("Failed to copy library from component");
-    });
+        for lib in libs {
+            fs::copy(lib.path(), rootfs_path.join("lib").join(lib.file_name())).expect("Failed to copy library from component");
+        }
+    }
 }
 
 fn compile(mpb: &Arc<MultiProgress>, job_name: &str, workspace_path: &Path, config: &BinaryComponentConfig, target: &str) {
