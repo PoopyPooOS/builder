@@ -20,7 +20,7 @@ async fn main() {
     check_dependencies();
 
     let command = Cli::parse().command();
-    let config = Config::read("build.toml").await;
+    let config = Config::read("builder.toml").await;
 
     match command {
         Command::Run { iso } => {
